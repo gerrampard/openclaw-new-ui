@@ -63,35 +63,55 @@ export default function ConfigPage() {
   const isDirty = rawConfig !== originalRaw;
 
   const handleSave = async () => {
-    if (!client || !snapshot) return;
+    console.log("[Config] handleSave called", { client: !!client, snapshot: !!snapshot, isDirty, rawConfigLength: rawConfig.length });
+    if (!client || !connected) {
+      toast({ title: "保存失败", description: "网关未连接，请检查连接状态", variant: "destructive" });
+      return;
+    }
+    if (!snapshot) {
+      toast({ title: "保存失败", description: "配置数据未加载，请先刷新页面", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
-      await client.request("config.set", { 
-        raw: rawConfig, 
-        baseHash: snapshot.hash 
+      const baseHash = snapshot.hash ?? "";
+      console.log("[Config] Sending config.set request");
+      await client.request("config.set", {
+        raw: rawConfig,
+        baseHash,
       });
-      toast({ title: "配置已保存", description: "配置已同步至磁盘，可以点“应用”使其实时生效。" });
+      toast({ title: "保存成功", description: "配置已保存到磁盘" });
       fetchData();
     } catch (err: any) {
       toast({ title: "保存失败", description: err.message, variant: "destructive" });
+      console.error("[Config] Save failed:", err);
     } finally {
       setSaving(false);
     }
   };
 
   const handleApply = async () => {
-    if (!client || !snapshot) return;
+    if (!client || !connected) {
+      toast({ title: "应用失败", description: "网关未连接，请检查连接状态", variant: "destructive" });
+      return;
+    }
+    if (!snapshot) {
+      toast({ title: "应用失败", description: "配置数据未加载，请先刷新页面", variant: "destructive" });
+      return;
+    }
     setApplying(true);
     try {
-      await client.request("config.apply", { 
-        raw: rawConfig, 
-        baseHash: snapshot.hash,
+      const baseHash = snapshot.hash ?? "";
+      await client.request("config.apply", {
+        raw: rawConfig,
+        baseHash,
         sessionKey: (window as any)._applySessionKey || "default-session"
       });
-      toast({ title: "配置已应用", description: "系统已完成平滑重载，新配置已生效。" });
+      toast({ title: "应用成功", description: "配置已应用，系统已重新加载" });
       fetchData();
     } catch (err: any) {
       toast({ title: "应用失败", description: err.message, variant: "destructive" });
+      console.error("[Config] Apply failed:", err);
     } finally {
       setApplying(false);
     }
@@ -215,7 +235,7 @@ export default function ConfigPage() {
                 <AlertCircle className="size-3" /> 注意事项
               </div>
               <p className="text-[10px] text-muted-foreground leading-relaxed">
-                部分配置更改（如监听端口）可能需要系统完全重启。建议优先使用“应用并启动”进行热更新。
+                部分配置更改（如监听端口）可能需要系统完全重启。建议优先使用"应用并启动"进行热更新。
               </p>
             </div>
           </div>
@@ -302,7 +322,7 @@ export default function ConfigPage() {
                   <FileJson className="size-8 text-muted-foreground stroke-1" />
                   <div className="space-y-1">
                     <p className="text-sm font-medium">需要配置更深层的参数？</p>
-                    <p className="text-xs text-muted-foreground italic">表单仅展示常用项，您可以切换到“源码模式”解锁 100% 的配置权限。</p>
+                    <p className="text-xs text-muted-foreground italic">表单仅展示常用项，您可以切换到"源码模式"解锁 100% 的配置权限。</p>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => setMode("raw")} className="rounded-xl">
                     进入源码编辑

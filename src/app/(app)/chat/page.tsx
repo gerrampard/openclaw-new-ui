@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo, memo } from "react";
+import { useEffect, useState, useRef, useMemo, memo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -146,7 +146,7 @@ export default function ChatPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
-  const fetchSessions = async () => {
+  const fetchSessions = useCallback(async () => {
     if (!client || !connected) return;
     try {
       const res: any = await client.request("sessions.list", { limit: 50, includeGlobal: true, includeUnknown: true });
@@ -154,9 +154,9 @@ export default function ChatPage() {
     } catch (e) {
       console.error("Failed to load sessions", e);
     }
-  };
+  }, [client, connected]);
 
-  const fetchModels = async () => {
+  const fetchModels = useCallback(async () => {
     if (!client || !connected) return;
     try {
       const res: any = await client.request("models.list", {});
@@ -164,9 +164,9 @@ export default function ChatPage() {
     } catch (e) {
       console.error("Failed to load models", e);
     }
-  };
+  }, [client, connected]);
 
-  const fetchConfig = async () => {
+  const fetchConfig = useCallback(async () => {
     if (!client || !connected) return;
     try {
       const res: any = await client.request("config.get", {});
@@ -180,7 +180,18 @@ export default function ChatPage() {
     } catch (e) {
       console.error("Failed to load config", e);
     }
-  };
+  }, [client, connected, selectedModel]);
+
+  const fetchHistory = useCallback(async (key: string) => {
+    if (!client || !connected) return;
+    try {
+      const res: any = await client.request("chat.history", { sessionKey: key, limit: 100 });
+      setMessages(res.messages || []);
+      setIsTyping(false);
+    } catch (e) {
+      toast({ title: "加载历史失败", description: "无法同步漫游记录", variant: "destructive" });
+    }
+  }, [client, connected, toast]);
 
   const activeModelData = useMemo(() => {
     return models.find(m => m.id === selectedModel);
@@ -207,17 +218,6 @@ export default function ChatPage() {
       console.error("Failed to load usage", e);
     } finally {
       setUsageLoading(false);
-    }
-  };
-
-  const fetchHistory = async (key: string) => {
-    if (!client || !connected) return;
-    try {
-      const res: any = await client.request("chat.history", { sessionKey: key, limit: 100 });
-      setMessages(res.messages || []);
-      setIsTyping(false); // Ensure typing stops when history is loaded (fail-safe)
-    } catch (e) {
-      toast({ title: "加载历史失败", description: "无法同步漫游记录", variant: "destructive" });
     }
   };
 
@@ -250,11 +250,11 @@ export default function ChatPage() {
     const handleEvent = (evt: any) => {
       if (evt.event === "chat") {
         const { state, message, sessionKey, errorMessage } = evt.payload;
-        
+
         // Flexible session key check
         const normalizedActive = activeSession.startsWith("agent:") ? activeSession.split(":").pop() : activeSession;
         const normalizedEvent = (sessionKey || "").startsWith("agent:") ? sessionKey.split(":").pop() : sessionKey;
-        
+
         if (sessionKey !== activeSession && normalizedEvent !== normalizedActive) {
             return;
         }
@@ -269,9 +269,12 @@ export default function ChatPage() {
             }
         } else if (state === "final" || state === "after-final" || state === "aborted") {
             setStreamingMessage(null);
-            setIsTyping(false); 
-            fetchHistory(activeSession);
-            fetchSessions();
+            setIsTyping(false);
+            // Debounce history/sessions fetch
+            setTimeout(() => {
+              fetchHistory(activeSession);
+              fetchSessions();
+            }, 500);
             if (evt.payload.usage) {
                 const usage = evt.payload.usage;
                 setSessionUsage(usage);
@@ -286,7 +289,7 @@ export default function ChatPage() {
       }
     };
     (client as any).opts.onEvent = handleEvent;
-  }, [client, activeSession]);
+  }, [client, activeSession, fetchHistory, fetchSessions, toast]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -294,34 +297,37 @@ export default function ChatPage() {
     }
   }, [messages, streamingMessage, isTyping]);
 
-  const handleSend = async () => {
+  const handleOpenSidebar = useCallback((content: string) => {
+    setSidebarContent(content);
+    setSidebarOpen(true);
+  }, []);
+
+  const handleSend = useCallback(async () => {
     if (!inputText.trim() || !client || !connected) return;
     const text = inputText;
-    const userMessage = { 
-        id: generateUUID(), 
-        role: "user", 
+    const userMessage = {
+        id: generateUUID(),
+        role: "user",
         content: text,
-        createdAt: new Date().toISOString() 
+        createdAt: new Date().toISOString()
     };
-    
+
     // Optimistic update
     setMessages(prev => [...prev, userMessage]);
-    
     setInputText("");
     setIsTyping(true);
+    setSelectedFiles([]);
     try {
-        await client.request("chat.send", { 
-            sessionKey: activeSession, 
-            message: text, 
+        await client.request("chat.send", {
+            sessionKey: activeSession,
+            message: text,
             idempotencyKey: userMessage.id
         });
     } catch (e: any) {
-        setIsTyping(false); 
+        setIsTyping(false);
         toast({ title: "发送失败", description: e.message, variant: "destructive" });
-    } finally {
-        setSelectedFiles([]); // Clear selected files after sending
     }
-  };
+  }, [inputText, client, connected, activeSession, toast]);
 
   const handleSwitchSession = (key: string) => {
     setActiveSession(key);
@@ -485,13 +491,13 @@ export default function ChatPage() {
                     <span className="text-xs font-bold flex items-center gap-2 uppercase opacity-60">
                         <div className={cn("size-2 rounded-full", row.color)} /> {row.label}
                     </span>
-                    <span className="font-mono text-sm font-black">{row.value}</span>
+                    <span className="font-mono text-sm font-black">{formatContext(row.value)}</span>
                 </div>
             ))}
           </div>
           <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-between">
             <span className="text-xs font-black uppercase tracking-widest text-primary/60">累计总计</span>
-            <span className="font-mono text-2xl font-black text-primary">{(activeSessionData.usage?.input || 0) + (activeSessionData.usage?.output || 0)}</span>
+            <span className="font-mono text-2xl font-black text-primary">{formatContext((activeSessionData.usage?.input || 0) + (activeSessionData.usage?.output || 0))}</span>
           </div>
         </div>
       </DialogContent>
@@ -538,7 +544,7 @@ export default function ChatPage() {
                     key={`${m.id || i}`} 
                     {...m}
                     isStreaming={false}
-                    onOpenSidebar={(content: string) => { setSidebarContent(content); setSidebarOpen(true); }}
+                    onOpenSidebar={handleOpenSidebar}
                     message={m}
                     agents={agents}
                     showDetails={showDetails}
@@ -562,7 +568,7 @@ export default function ChatPage() {
                     content={streamingMessage.content}
                     message={streamingMessage} 
                     isStreaming={true}
-                    onOpenSidebar={(content: string) => { setSidebarContent(content); setSidebarOpen(true); }}
+                    onOpenSidebar={handleOpenSidebar}
                     agents={agents}
                     showDetails={showDetails}
                   />
@@ -598,23 +604,50 @@ export default function ChatPage() {
                                         <Button variant="ghost" size="icon" className="size-6 rounded-lg text-primary hover:bg-primary/5" onClick={handleNewSession}><Plus className="size-3.5" /></Button>
                                     </div>
                                     <div className="max-h-64 overflow-y-auto space-y-1 p-1 custom-scrollbar">
-                                        {sessions.map(s => (
-                                            <DropdownMenuItem 
-                                                key={s.key} 
-                                                onClick={() => handleSwitchSession(s.key)} 
-                                                className={cn(
-                                                    "w-full text-left p-2.5 rounded-xl transition-all flex items-center gap-3 cursor-pointer outline-none focus:bg-muted", 
-                                                    activeSession === s.key ? "bg-primary/10 text-primary border-primary/20" : "text-muted-foreground/60 focus:text-foreground"
-                                                )}
-                                            >
-                                                <Bot className="size-3.5 shrink-0 opacity-40" />
-                                                <div className="flex-1 min-w-0 pr-2">
-                                                    <p className="text-[11px] font-bold truncate">{s.displayName || s.label || s.key}</p>
+                                        {(() => {
+                                          // Group sessions by agent prefix
+                                          const grouped: Record<string, typeof sessions> = {};
+                                          sessions.forEach(s => {
+                                            const agentPrefix = s.key?.startsWith("agent:") ? s.key.split(":")[1] : "main";
+                                            if (!grouped[agentPrefix]) grouped[agentPrefix] = [];
+                                            grouped[agentPrefix].push(s);
+                                          });
+                                          // Generate consistent color from agentId
+                                          const getAgentColor = (agentId: string) => {
+                                            const hash = agentId.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+                                            const hue = hash % 360;
+                                            return `hsl(${hue}, 65%, 50%)`;
+                                          };
+                                          return Object.entries(grouped).map(([agentId, agentSessions]) => {
+                                            const color = getAgentColor(agentId);
+                                            return (
+                                            <div key={agentId}>
+                                              <div className="flex items-center gap-2 px-2.5 py-1.5 mt-1 first:mt-0">
+                                                <div className="size-2 rounded-full" style={{ backgroundColor: color }} />
+                                                <span className="text-[9px] font-black uppercase tracking-widest opacity-40">{agentId}</span>
+                                              </div>
+                                              {agentSessions.map(s => (
+                                                <DropdownMenuItem
+                                                  key={s.key}
+                                                  onClick={() => handleSwitchSession(s.key)}
+                                                  className={cn(
+                                                    "w-full text-left p-2.5 rounded-xl transition-all flex items-center gap-3 cursor-pointer outline-none focus:bg-muted",
+                                                    activeSession === s.key ? "border" : "border-transparent"
+                                                  )}
+                                                  style={activeSession === s.key ? { backgroundColor: `${color}15`, borderColor: `${color}30` } : {}}
+                                                >
+                                                  <Bot className="size-3.5 shrink-0" style={{ color, opacity: 0.6 }} />
+                                                  <div className="flex-1 min-w-0 pr-2">
+                                                    <p className="text-[11px] font-bold truncate" style={activeSession === s.key ? { color } : {}}>{s.displayName || s.label || s.key.split(":").pop()}</p>
                                                     <p className="text-[9px] opacity-30 font-mono truncate">{s.key}</p>
-                                                </div>
-                                                {activeSession === s.key && <Check className="size-3" />}
-                                            </DropdownMenuItem>
-                                        ))}
+                                                  </div>
+                                                  {activeSession === s.key && <Check className="size-3" style={{ color }} />}
+                                                </DropdownMenuItem>
+                                              ))}
+                                            </div>
+                                          );
+                                          });
+                                        })()}
                                     </div>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -637,26 +670,48 @@ export default function ChatPage() {
                                         <Monitor className="size-3" /> 模型列表
                                     </div>
                                     <div className="max-h-60 overflow-y-auto p-1 py-1.5 custom-scrollbar">
-                                        {models.map((m, i) => (
-                                            <DropdownMenuItem 
-                                                key={`${m.id}-${i}`} 
-                                                onClick={() => { setSelectedModel(m.id); }} 
-                                                className={cn(
-                                                    "w-full text-left p-2.5 rounded-xl transition-all group flex items-start gap-3 cursor-pointer outline-none focus:bg-muted", 
-                                                    selectedModel === m.id ? "bg-primary/10 text-primary border-primary/20" : "opacity-80 focus:opacity-100"
-                                                )}
-                                            >
-                                                <div className="size-2 rounded-full mt-1.5 opacity-40 group-hover:opacity-100" style={{ backgroundColor: `hsl(${Math.abs(generateUUID().split('').reduce((a,b)=>a+b.charCodeAt(0),0)%360)}, 70%, 50%)` }} />
-                                                <div className="flex flex-col min-w-0">
-                                                    <p className="text-[11px] font-bold truncate">{m.name || m.id}</p>
-                                                    {(m.provider || m.config_key || m.owned_by) && (
-                                                        <p className="text-[9px] font-black uppercase opacity-30 tracking-tight mt-0.5">
-                                                            {m.provider || m.config_key || m.owned_by}
-                                                        </p>
-                                                    )}
+                                        {(() => {
+                                          // Group models by provider
+                                          const grouped: Record<string, typeof models> = {};
+                                          models.forEach(m => {
+                                            const provider = m.provider || m.config_key || m.owned_by || "unknown";
+                                            if (!grouped[provider]) grouped[provider] = [];
+                                            grouped[provider].push(m);
+                                          });
+                                          // Generate consistent color from provider name
+                                          const getProviderColor = (provider: string) => {
+                                            const hash = provider.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+                                            const hue = hash % 360;
+                                            return `hsl(${hue}, 65%, 50%)`;
+                                          };
+                                          return Object.entries(grouped).map(([provider, providerModels]) => {
+                                            const color = getProviderColor(provider);
+                                            return (
+                                              <div key={provider}>
+                                                <div className="flex items-center gap-2 px-2.5 py-1.5 mt-1 first:mt-0">
+                                                  <div className="size-2 rounded-full" style={{ backgroundColor: color }} />
+                                                  <span className="text-[9px] font-black uppercase tracking-widest opacity-40">{provider}</span>
                                                 </div>
-                                            </DropdownMenuItem>
-                                        ))}
+                                                {providerModels.map((m, i) => (
+                                                  <DropdownMenuItem
+                                                    key={`${m.id}-${i}`}
+                                                    onClick={() => { setSelectedModel(m.id); }}
+                                                    className={cn(
+                                                      "w-full text-left p-2.5 rounded-xl transition-all group flex items-start gap-3 cursor-pointer outline-none focus:bg-muted",
+                                                      selectedModel === m.id ? "border" : "border-transparent"
+                                                    )}
+                                                    style={selectedModel === m.id ? { backgroundColor: `${color}15`, borderColor: `${color}30` } : {}}
+                                                  >
+                                                    <div className="size-2 rounded-full mt-1.5" style={{ backgroundColor: color, opacity: 0.6 }} />
+                                                    <div className="flex flex-col min-w-0">
+                                                      <p className="text-[11px] font-bold truncate" style={selectedModel === m.id ? { color } : {}}>{m.name || m.id}</p>
+                                                    </div>
+                                                  </DropdownMenuItem>
+                                                ))}
+                                              </div>
+                                            );
+                                          });
+                                        })()}
                                     </div>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -1026,6 +1081,7 @@ function extractText(message: any): string | null {
 
 function formatContext(num: number): string {
     if (!num) return "0";
+    if (num >= 1000000000) return (num / 1000000000).toFixed(1).replace(/\.0$/, '') + 'B';
     if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
     if (num >= 1000) return (num / 1000).toFixed(0) + 'K';
     return num.toString();
