@@ -8,12 +8,13 @@ import { RefreshCw, Activity, Coins, Database, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Helper functions for formatting
-const formatNumber = (num: number) => new Intl.NumberFormat("en-US").format(num);
-const formatTokens = (num: number) => {
-  if (num >= 1000000) return (num / 1000000).toFixed(2) + "M";
-  if (num >= 1000) return (num / 1000).toFixed(1) + "k";
+const formatNumber = (num: number) => {
+  if (num >= 1000000000) return (num / 1000000000).toFixed(1) + "B";
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+  if (num >= 1000) return (num / 1000).toFixed(1) + "K";
   return num.toString();
 };
+const formatTokens = formatNumber;
 const formatCost = (num: number) => {
   return "$" + num.toFixed(4);
 };
