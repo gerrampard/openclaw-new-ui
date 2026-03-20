@@ -488,9 +488,9 @@ export default function ChatPage() {
 
   const renderUsageModal = () => (
     <Dialog open={isUsageOpen} onOpenChange={setIsUsageOpen}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 uppercase tracking-tighter">
+      <DialogContent className="w-[92vw] sm:max-w-[425px] rounded-[1.8rem] sm:rounded-2xl p-4 sm:p-6 overflow-hidden">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="flex items-center gap-2 uppercase tracking-tighter text-lg font-black">
             <BarChart2 className="size-5 text-green-500" /> 用量统计
           </DialogTitle>
         </DialogHeader>
@@ -514,9 +514,9 @@ export default function ChatPage() {
                 </div>
             ))}
           </div>
-          <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-widest text-primary/60">累计总计</span>
-            <span className="font-mono text-2xl font-black text-primary">{formatContext((activeSessionData.usage?.input || 0) + (activeSessionData.usage?.output || 0))}</span>
+          <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-between">
+            <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-primary/60">累计总计</span>
+            <span className="font-mono text-xl sm:text-2xl font-black text-primary">{formatContext((activeSessionData.usage?.input || 0) + (activeSessionData.usage?.output || 0))}</span>
           </div>
         </div>
       </DialogContent>
