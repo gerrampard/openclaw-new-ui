@@ -433,43 +433,43 @@ export default function ChatPage() {
 
   const renderCommandsModal = () => (
     <Dialog open={isCommandsOpen} onOpenChange={setIsCommandsOpen}>
-      <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0">
-        <DialogHeader className="p-6 pb-2 border-b">
-          <DialogTitle className="flex items-center gap-3 text-xl">
-            <SquareTerminal className="size-6 text-orange-500" /> 快捷命令控制台
+      <DialogContent className="w-[96vw] sm:max-w-[600px] max-h-[90vh] sm:max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 rounded-[1.8rem] sm:rounded-2xl">
+        <DialogHeader className="p-4 sm:p-6 pb-2 sm:pb-3 border-b">
+          <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl font-black">
+            <SquareTerminal className="size-5 sm:size-6 text-orange-500" /> 快捷命令控制台
           </DialogTitle>
-          <p className="text-xs text-muted-foreground opacity-50 mt-1 uppercase tracking-widest font-black">OpenClaw Mesh Command Center</p>
+          <p className="text-[10px] sm:text-xs text-muted-foreground opacity-50 mt-1 uppercase tracking-widest font-black">OpenClaw Mesh Command Center</p>
         </DialogHeader>
-        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 sm:space-y-8 custom-scrollbar">
           {Object.keys(CATEGORY_LABELS).map(cat => {
               const catCmds = SLASH_COMMANDS.filter(c => c.category === cat);
               if (catCmds.length === 0) return null;
               return (
-                  <div key={cat} className="space-y-4">
+                  <div key={cat} className="space-y-3 sm:space-y-4">
                       <div className="flex items-center gap-3">
-                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40 whitespace-nowrap">{CATEGORY_LABELS[cat]}</span>
+                          <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40 whitespace-nowrap">{CATEGORY_LABELS[cat]}</span>
                           <div className="h-px w-full bg-gradient-to-r from-muted-foreground/10 to-transparent" />
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                         {catCmds.map(cmd => (
                             <button 
                                 key={cmd.name}
                                 onClick={() => handleCommandClick(cmd)}
-                                className="flex items-start gap-4 p-4 rounded-[1.2rem] bg-muted/20 border border-border/40 hover:bg-primary/5 hover:border-primary/20 transition-all group text-left relative overflow-hidden active:scale-95"
+                                className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-[1.2rem] bg-muted/20 border border-border/40 hover:bg-primary/5 hover:border-primary/20 transition-all group text-left relative overflow-hidden active:scale-95"
                             >
-                                <div className="size-10 rounded-xl bg-background border border-border/50 flex items-center justify-center shrink-0 group-hover:text-primary transition-colors">
-                                    <cmd.icon className="size-5 stroke-[1.5]" />
+                                <div className="size-8 sm:size-10 rounded-xl bg-background border border-border/50 flex items-center justify-center shrink-0 group-hover:text-primary transition-colors">
+                                    <cmd.icon className="size-4 sm:size-5 stroke-[1.5]" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <p className="text-sm font-bold tracking-tight">/{cmd.name}</p>
-                                        <p className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground opacity-30">{cmd.label}</p>
+                                    <div className="flex items-center gap-1.5 sm:gap-2">
+                                        <p className="text-xs sm:text-sm font-bold tracking-tight">/{cmd.name}</p>
+                                        <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-tighter text-muted-foreground opacity-30 line-clamp-1">{cmd.label}</p>
                                     </div>
-                                    <p className="text-[11px] text-muted-foreground leading-relaxed mt-1 line-clamp-2 opacity-60 group-hover:opacity-100 transition-opacity">{cmd.description}</p>
+                                    <p className="text-[10px] sm:text-[11px] text-muted-foreground leading-relaxed mt-0.5 sm:mt-1 line-clamp-2 opacity-60 group-hover:opacity-100 transition-opacity">{cmd.description}</p>
                                 </div>
                                 {cmd.args && (
-                                    <div className="absolute right-3 top-3">
-                                        <div className="px-1.5 py-0.5 rounded-md bg-orange-500/10 text-orange-600 text-[8px] font-black uppercase tracking-widest">Args</div>
+                                    <div className="absolute right-2.5 top-2.5 sm:right-3 sm:top-3">
+                                        <div className="px-1.5 py-0.5 rounded-md bg-orange-500/10 text-orange-600 text-[7px] sm:text-[8px] font-black uppercase tracking-widest">Args</div>
                                     </div>
                                 )}
                             </button>
